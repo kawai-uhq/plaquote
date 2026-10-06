@@ -1,0 +1,34 @@
+PLAQUOTE - TERMUX + GITHUB
+
+1) Install Termux from F-Droid/GitHub, then:
+   pkg update -y
+   pkg upgrade -y
+   pkg install git openjdk-17 gradle -y
+
+2) Put this project somewhere in Termux, then:
+   cd Plaquote
+   gradle wrapper --gradle-version 8.9
+   chmod +x gradlew
+
+3) Test locally:
+   ./gradlew assembleDebug
+
+4) APK:
+   app/build/outputs/apk/debug/app-debug.apk
+
+5) GitHub:
+   git init
+   git add .
+   git commit -m "Initial Plaquote app"
+   git branch -M main
+   git remote add origin https://github.com/YOUR_USERNAME/Plaquote.git
+   git push -u origin main
+
+6) GitHub will run .github/workflows/build.yml.
+   Open GitHub > Actions > Build Plaquote APK.
+   After it finishes, open the run and download the Plaquote-debug-apk artifact.
+
+IMPORTANT:
+- Do not upload keystore/password files to GitHub.
+- The current Search, AI Help and + buttons are UI placeholders.
+- The next phase can add patient records, notes, prescriptions, reminders, local database, backup, and AI assistance.
