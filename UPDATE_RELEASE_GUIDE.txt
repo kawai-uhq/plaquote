@@ -1,0 +1,13 @@
+PLAQUOTE AUTO UPDATER
+
+The app checks the GitHub Releases API on startup.
+
+For a new release:
+1. Increase versionCode/versionName in app/build.gradle.kts.
+2. Push to main.
+3. Run GitHub Actions.
+4. Create a GitHub Release with a tag such as v1.2.
+5. Attach the built APK and name it exactly Plaquote.apk.
+6. Publish the release.
+
+The installed app will detect a newer release and offer to download/install it.

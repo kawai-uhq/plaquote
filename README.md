@@ -1,14 +1,12 @@
 # Plaquote
 
-Starter Android UI for a dental clinic.
-
-Includes:
-- blue curved header
-- light/dark switch
-- search placeholder
+Updated starter with:
+- straight blue header
 - tooth doodle pattern
-- AI Help placeholder
-- + new-note placeholder
+- supplied Plaquote launcher image
+- logo on home screen
+- automatic GitHub release updater
 - GitHub Actions APK build
 
-The buttons are intentionally placeholders for the next development phase.
+Auto-updater endpoint:
+https://api.github.com/repos/kawai-uhq/plaquote/releases/latest
