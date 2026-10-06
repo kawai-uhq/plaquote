@@ -1,0 +1,15 @@
+.gradle/
+build/
+**/build/
+local.properties
+
+*.jks
+*.keystore
+*.p12
+plaquote-keystore.txt
+
+.idea/
+*.iml
+
+.DS_Store
+Thumbs.db
