@@ -1,0 +1,19 @@
+PLAQUOTE — FROM ZERO
+
+1. Download and extract this ZIP into ~/Plaquote.
+2. Open Termux: cd ~/Plaquote
+3. Generate wrapper: gradle wrapper --gradle-version 8.9
+4. Make wrapper executable: chmod +x gradlew
+5. Confirm: ls -la gradlew gradle/wrapper
+6. IMPORTANT: do not create a new signing key if an older Plaquote APK is already installed. This project currently builds the DEBUG APK, matching the previous workflow.
+7. Check Git: git status
+8. Add files: git add .
+9. Commit: git commit -m "Plaquote 1.2 home screen update"
+10. Push the branch: git push origin main
+11. Create and push the release tag: git tag v1.2 && git push origin v1.2
+12. GitHub Actions builds Plaquote.apk and publishes it as the v1.2 GitHub Release asset.
+13. Install the new APK once manually. Future versions require increasing versionCode/versionName and creating a new v<version> tag.
+
+IMPORTANT: The updater uses GitHub Releases, not Actions artifacts. The release asset must be named Plaquote.apk.
+
+If the currently installed app was signed with a different private key, Android will reject an update. In that case, do not uninstall the old app until the signing key is recovered.

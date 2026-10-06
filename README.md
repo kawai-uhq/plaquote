@@ -1,12 +1,12 @@
 # Plaquote
 
-Updated starter with:
-- straight blue header
-- tooth doodle pattern
-- supplied Plaquote launcher image
-- logo on home screen
-- automatic GitHub release updater
-- GitHub Actions APK build
+Android dental clinic notes/reminders app.
 
-Auto-updater endpoint:
-https://api.github.com/repos/kawai-uhq/plaquote/releases/latest
+## Home screen
+The home screen does not display the Plaquote logo or the Plaquote wordmark. The logo is used only as the Android launcher icon.
+
+## Build
+Generate the Gradle wrapper in Termux with `gradle wrapper --gradle-version 8.9`, then commit `gradlew` and `gradle/wrapper/` to GitHub. GitHub Actions builds the APK.
+
+## Updates
+The app checks the latest GitHub Release for an asset named `Plaquote.apk`. Release tags must use the `v<version>` format, e.g. `v1.2`.

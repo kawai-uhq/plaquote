@@ -37,9 +37,6 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         strokeWidth=3f
         color=Color.rgb(225,238,253)
     }
-    private val logo = BitmapFactory.decodeResource(resources,
-        resources.getIdentifier("plaquote_logo","drawable",ctx.packageName))
-
     override fun onDraw(c: Canvas) {
         val w=width.toFloat(); val h=height.toFloat()
         c.drawColor(if(dark) Color.rgb(11,18,32) else Color.WHITE)
@@ -65,16 +62,6 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         drawToggle(c,24f,28f,174f,54f)
         p.color=Color.argb(65,255,255,255); c.drawCircle(w-54f,55f,28f,p)
         drawSearch(c,w-54f,55f)
-
-        val size=minOf(w*.48f,280f)
-        val top=h*.24f
-        c.drawBitmap(logo,null,RectF((w-size)/2f,top,(w+size)/2f,top+size),p)
-
-        p.color=if(dark)Color.WHITE else Color.rgb(12,68,145)
-        p.textAlign=Paint.Align.CENTER; p.typeface=Typeface.DEFAULT_BOLD
-        p.textSize=minOf(w*.12f,58f)
-        c.drawText("Plaquote",w/2f,top+size+62f,p)
-        p.textAlign=Paint.Align.LEFT; p.typeface=Typeface.DEFAULT
 
         drawAI(c,24f,h-78f)
 
@@ -138,7 +125,7 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
 
 class AppUpdater(private val activity:Activity) {
     companion object {
-        const val CURRENT_VERSION="1.1"
+        const val CURRENT_VERSION="1.2"
         const val API="https://api.github.com/repos/kawai-uhq/plaquote/releases/latest"
     }
     @Volatile var cancelled=false
