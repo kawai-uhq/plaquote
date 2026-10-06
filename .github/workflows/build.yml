@@ -15,6 +15,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      HAS_SIGNING_KEY: ${{ secrets.KEYSTORE_BASE64 != '' }}
+
     steps:
       - name: Checkout Plaquote
         uses: actions/checkout@v4
@@ -35,28 +38,25 @@ jobs:
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Decode signing key
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: env.HAS_SIGNING_KEY == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/plaquote-release.jks"
 
-      - name: Build signed release APK
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+      - name: Build release APK
+        if: env.HAS_SIGNING_KEY == 'true'
         env:
+          KEYSTORE_FILE: ${{ runner.temp }}/plaquote-release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleRelease \
-            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/plaquote-release.jks" \
-            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+          ./gradlew --no-daemon assembleRelease
 
       - name: Build debug APK
-        if: ${{ secrets.KEYSTORE_BASE64 == '' }}
+        if: env.HAS_SIGNING_KEY != 'true'
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
