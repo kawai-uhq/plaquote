@@ -39,7 +39,6 @@ class MainActivity : Activity() {
 
 class PlaquoteView(private val ctx: Context) : View(ctx) {
 
-    // 0f = light, 1f = dark
     private var themeProgress = 0f
     private var targetDark = false
     private var animator: ValueAnimator? = null
@@ -109,22 +108,18 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
             drawMolar(c, t.nx * w, t.ny * h, 28f * t.scale, t.sparkle, t.shine)
         }
 
-        // Header
         p.shader = LinearGradient(0f, 0f, w, h * 0.14f, blue, darkBlue, Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, w, h * 0.14f, p)
         p.shader = null
 
         drawToggle(c, 24f, 26f, 168f, 50f)
 
-        // Search
         p.color = Color.argb(65, 255, 255, 255)
         c.drawCircle(w - 52f, 52f, 26f, p)
         drawSearchIcon(c, w - 52f, 52f)
 
-        // AI Help
         drawAI(c, 20f, h - 74f)
 
-        // FAB
         p.setShadowLayer(16f, 0f, 6f, Color.argb(70, 0, 70, 180))
         setLayerType(LAYER_TYPE_SOFTWARE, p)
         p.color = blue
@@ -525,11 +520,19 @@ class AppUpdater(private val activity: Activity) {
 
     private fun install(file: File) {
         if (Build.VERSION.SDK_INT >= 26 && !activity.packageManager.canRequestPackageInstalls()) {
-            val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                Uri.parse("package:${activity.packageName}"))
+            val intent = Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:${activity.packageName}")
+            )
             activity.startActivity(intent)
             Toast.makeText(activity, "Allow Plaquote to install updates, then open the app again.", Toast.LENGTH_LONG).show()
             return
         }
         val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_VIEW).app
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        activity.startActivity(intent)
+    }
+}
