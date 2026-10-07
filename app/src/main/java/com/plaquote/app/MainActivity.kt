@@ -1,5 +1,8 @@
 package com.plaquote.app
 
+import android.widget.*
+import android.graphics.drawable.GradientDrawable
+import org.json.JSONArray
 import android.app.*
 import android.os.*
 import android.graphics.*
@@ -196,17 +199,155 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         c.drawText("AI Help",x+64f,y+33f,p); p.typeface=Typeface.DEFAULT
     }
 
-    override fun onTouchEvent(e:MotionEvent):Boolean {
-        if(e.action!=MotionEvent.ACTION_UP)return true
-        val x=e.x; val y=e.y; val w=width.toFloat(); val h=height.toFloat()
-        if(x in 24f..198f && y in 28f..82f) {
-            dark=!dark; invalidate()
-        } else if((x-(w-54f))*(x-(w-54f))+(y-55f)*(y-55f)<35f*35f) {
-            android.widget.Toast.makeText(ctx,"Search — coming soon",android.widget.Toast.LENGTH_SHORT).show()
-        } else if(x in 24f..176f && y>h-95f) {
-            android.widget.Toast.makeText(ctx,"AI Help — coming soon",android.widget.Toast.LENGTH_SHORT).show()
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+    if (e.action != MotionEvent.ACTION_UP) return true
+    val x = e.x
+    val y = e.y
+    val w = width.toFloat()
+    val h = height.toFloat()
+
+    if (x in 24f..192f && y in 26f..76f) {
+        toggleTheme()
+    } else if ((x - (w - 52f)).pow(2) + (y - 52f).pow(2) < 30f * 30f) {
+        android.widget.Toast.makeText(ctx, "Search — coming soon", android.widget.Toast.LENGTH_SHORT).show()
+    } else if (x in 20f..168f && y > h - 90f) {
+        showAIHelpDialog()
+    }
+    return true
+}
+
+private fun showAIHelpDialog() {
+    val activity = ctx as Activity
+
+    val container = LinearLayout(ctx).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(40, 30, 40, 20)
+    }
+
+    val chatView = TextView(ctx).apply {
+        text = "Ask any dental question...\n\n"
+        textSize = 15f
+        setTextColor(Color.parseColor("#222222"))
+        setPadding(0, 0, 0, 16)
+    }
+
+    val scroll = ScrollView(ctx).apply {
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 480
+        )
+        addView(chatView)
+    }
+
+    val input = EditText(ctx).apply {
+        hint = "Type your question here..."
+        setPadding(28, 22, 28, 22)
+        background = GradientDrawable().apply {
+            setColor(Color.parseColor("#F0F4F8"))
+            cornerRadius = 18f
         }
-        return true
+    }
+
+    val sendBtn = Button(ctx).apply {
+        text = "Ask AI"
+        setBackgroundColor(Color.parseColor("#1677F0"))
+        setTextColor(Color.WHITE)
+
+        setOnClickListener {
+            val question = input.text.toString().trim()
+            if (question.isEmpty()) return@setOnClickListener
+
+            chatView.append("You: $question\n\n")
+            chatView.append("AI: Thinking...\n\n")
+            input.setText("")
+            scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+            sendBtn.isEnabled = false
+
+            // Call real Gemini AI
+            thread {
+                val answer = askGemini(question)
+                activity.runOnUiThread {
+                    // Remove the "Thinking..." line
+                    val current = chatView.text.toString()
+                    chatView.text = current.replace("AI: Thinking...\n\n", "AI: $answer\n\n")
+                    sendBtn.isEnabled = true
+                    scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+                }
+            }
+        }
+    }
+
+    container.addView(scroll)
+    container.addView(input)
+    container.addView(sendBtn)
+
+    AlertDialog.Builder(activity)
+        .setTitle("Dental AI Help")
+        .setView(container)
+        .setNegativeButton("Close", null)
+        .show()
+}
+
+private fun askGemini(question: String): String {
+    // ⚠️ Paste your Gemini API key here
+    val apiKey = "PASTE_YOUR_GEMINI_API_KEY_HERE"
+
+    if (apiKey == "PASTE_YOUR_GEMINI_API_KEY_HERE" || apiKey.isBlank()) {
+        return "Please add your Gemini API key in the code first.\n\nGet a free key at:\nhttps://aistudio.google.com/app/apikey"
+    }
+
+    return try {
+        val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
+        val conn = url.openConnection() as HttpURLConnection
+        conn.requestMethod = "POST"
+        conn.setRequestProperty("Content-Type", "application/json")
+        conn.doOutput = true
+        conn.connectTimeout = 15000
+        conn.readTimeout = 20000
+
+        val prompt = """
+            You are a helpful and accurate dental assistant.
+            Answer the user's question clearly and professionally.
+            Focus only on dental and oral health topics.
+            Always end your answer with this exact disclaimer:
+            "⚠️ This is general information only and not a substitute for professional dental advice."
+            
+            User question: $question
+        """.trimIndent()
+
+        val body = """
+            {
+              "contents": [{
+                "parts": [{"text": ${JSONObject.quote(prompt)}}]
+              }]
+            }
+        """.trimIndent()
+
+        conn.outputStream.use { it.write(body.toByteArray()) }
+
+        val responseCode = conn.responseCode
+        val response = if (responseCode in 200..299) {
+            conn.inputStream.bufferedReader().use { it.readText() }
+        } else {
+            conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "Error $responseCode"
+        }
+        conn.disconnect()
+
+        if (responseCode !in 200..299) {
+            return "Sorry, AI is temporarily unavailable.\n($responseCode)"
+        }
+
+        val json = JSONObject(response)
+        val candidates = json.optJSONArray("candidates")
+        if (candidates != null && candidates.length() > 0) {
+            val content = candidates.getJSONObject(0).optJSONObject("content")
+            val parts = content?.optJSONArray("parts")
+            if (parts != null && parts.length() > 0) {
+                return parts.getJSONObject(0).optString("text", "No answer received.")
+            }
+        }
+        "Sorry, I couldn't generate an answer."
+    } catch (e: Exception) {
+        "Connection error. Please check your internet.\n(${e.message})"
     }
 }
 
