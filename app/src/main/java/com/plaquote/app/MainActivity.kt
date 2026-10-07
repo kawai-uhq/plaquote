@@ -74,16 +74,103 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         p.strokeCap=Paint.Cap.BUTT
     }
 
-    private fun drawTooth(c:Canvas,x:Float,y:Float,s:Float) {
-        val q=Path()
-        q.moveTo(x-s*.48f,y-s*.28f)
-        q.cubicTo(x-s*.65f,y-s*.70f,x-s*.15f,y-s*.78f,x,y-s*.50f)
-        q.cubicTo(x+s*.18f,y-s*.78f,x+s*.65f,y-s*.65f,x+s*.47f,y-s*.25f)
-        q.cubicTo(x+s*.40f,y+s*.05f,x+s*.30f,y+s*.10f,x+s*.20f,y+s*.48f)
-        q.cubicTo(x+s*.08f,y+s*.72f,x-s*.08f,y+s*.72f,x-s*.18f,y+s*.43f)
-        q.cubicTo(x-s*.28f,y+s*.12f,x-s*.40f,y+s*.04f,x-s*.48f,y-s*.28f)
-        c.drawPath(q,tooth)
+    private fun drawTooth(c: Canvas, x: Float, y: Float, s: Float) {
+    val q = Path()
+
+    // Upper crown — rounded and wide like a real tooth
+    q.moveTo(
+        x - s * 0.34f,
+        y - s * 0.30f
+    )
+
+    q.cubicTo(
+        x - s * 0.48f, y - s * 0.24f,
+        x - s * 0.50f, y - s * 0.05f,
+        x - s * 0.40f, y + s * 0.08f
+    )
+
+    // Left side narrowing toward the root
+    q.cubicTo(
+        x - s * 0.34f, y + s * 0.17f,
+        x - s * 0.25f, y + s * 0.18f,
+        x - s * 0.20f, y + s * 0.28f
+    )
+
+    // Left root
+    q.cubicTo(
+        x - s * 0.18f, y + s * 0.43f,
+        x - s * 0.10f, y + s * 0.52f,
+        x - s * 0.04f, y + s * 0.55f
+    )
+
+    q.cubicTo(
+        x - s * 0.01f, y + s * 0.56f,
+        x + s * 0.01f, y + s * 0.48f,
+        x + s * 0.03f, y + s * 0.36f
+    )
+
+    // Right root
+    q.cubicTo(
+        x + s * 0.05f, y + s * 0.49f,
+        x + s * 0.10f, y + s * 0.55f,
+        x + s * 0.15f, y + s * 0.48f
+    )
+
+    q.cubicTo(
+        x + s * 0.23f, y + s * 0.36f,
+        x + s * 0.27f, y + s * 0.25f,
+        x + s * 0.32f, y + s * 0.15f
+    )
+
+    // Right side of crown
+    q.cubicTo(
+        x + s * 0.43f, y - s * 0.01f,
+        x + s * 0.47f, y - s * 0.20f,
+        x + s * 0.34f, y - s * 0.30f
+    )
+
+    q.cubicTo(
+        x + s * 0.25f, y - s * 0.37f,
+        x + s * 0.15f, y - s * 0.30f,
+        x, y - s * 0.24f
+    )
+
+    q.cubicTo(
+        x - s * 0.15f, y - s * 0.30f,
+        x - s * 0.25f, y - s * 0.37f,
+        x - s * 0.34f, y - s * 0.30f
+    )
+
+    q.close()
+
+    c.drawPath(q, tooth)
+
+    // Small curved separation between crown and roots
+    val detail = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = s * 0.025f
+        color = tooth.color
+        strokeCap = Paint.Cap.ROUND
     }
+
+    val crownLine = Path()
+
+    crownLine.moveTo(
+        x - s * 0.25f,
+        y + s * 0.08f
+    )
+
+    crownLine.cubicTo(
+        x - s * 0.12f,
+        y + s * 0.16f,
+        x + s * 0.12f,
+        y + s * 0.16f,
+        x + s * 0.25f,
+        y + s * 0.08f
+    )
+
+    c.drawPath(crownLine, detail)
+}
 
     private fun drawToggle(c:Canvas,x:Float,y:Float,w:Float,h:Float) {
         p.color=Color.argb(190,0,50,130); c.drawRoundRect(x,y,x+w,y+h,h/2,h/2,p)
