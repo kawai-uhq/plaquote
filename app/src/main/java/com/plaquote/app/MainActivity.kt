@@ -275,12 +275,12 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
             .setView(input)
             .setPositiveButton("Save & Continue") { _, _ ->
                 val key = input.text.toString().trim()
-                if (key.startsWith("AIza")) {
-                    prefs.edit().putString("gemini_api_key", key).apply()
-                    openChatDialog(activity, key)
-                } else {
-                    Toast.makeText(activity, "Invalid API key", Toast.LENGTH_LONG).show()
-                }
+                if (key.length > 20) {   // simple length check instead of prefix
+    prefs.edit().putString("gemini_api_key", key).apply()
+    openChatDialog(activity, key)
+} else {
+    Toast.makeText(activity, "Invalid API key", Toast.LENGTH_LONG).show()
+}
             }
             .setNegativeButton("Cancel", null)
             .show()
