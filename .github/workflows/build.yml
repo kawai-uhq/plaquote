@@ -63,11 +63,22 @@ jobs:
 
       - name: Prepare APK
         run: |
-          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/Plaquote.apk
-          else
-            cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/Plaquote.apk
+          echo "APK files produced by Gradle:"
+          find app/build/outputs/apk -type f -name "*.apk" -print
+
+          APK=$(find app/build/outputs/apk/release -type f -name "*.apk" 2>/dev/null | head -n 1)
+
+          if [ -z "$APK" ]; then
+            APK=$(find app/build/outputs/apk/debug -type f -name "*.apk" 2>/dev/null | head -n 1)
           fi
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: No APK was produced."
+            exit 1
+          fi
+
+          echo "Using APK: $APK"
+          cp "$APK" app/build/outputs/apk/Plaquote.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
