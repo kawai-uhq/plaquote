@@ -1,12 +1,10 @@
 name: Build Plaquote APK
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
-    tags:
-      - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,11 +13,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    env:
-      HAS_SIGNING_KEY: ${{ secrets.KEYSTORE_BASE64 != '' }}
-
     steps:
-      - name: Checkout Plaquote
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -30,22 +25,23 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
-        with:
-          packages: "platform-tools"
 
-      - name: Install Android SDK
+      - name: Install Android SDK packages
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Decode signing key
-        if: env.HAS_SIGNING_KEY == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/plaquote-release.jks"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/plaquote-release.jks"
+            echo "Signing key decoded."
+          else
+            echo "No signing key found."
+          fi
 
-      - name: Build release APK
-        if: env.HAS_SIGNING_KEY == 'true'
+      - name: Build APK
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/plaquote-release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -53,42 +49,37 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleRelease
 
-      - name: Build debug APK
-        if: env.HAS_SIGNING_KEY != 'true'
-        run: |
-          chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
-
-      - name: Prepare APK
-        run: |
-          echo "APK files produced by Gradle:"
-          find app/build/outputs/apk -type f -name "*.apk" -print
-
-          APK=$(find app/build/outputs/apk/release -type f -name "*.apk" 2>/dev/null | head -n 1)
-
-          if [ -z "$APK" ]; then
-            APK=$(find app/build/outputs/apk/debug -type f -name "*.apk" 2>/dev/null | head -n 1)
+          if [ -f "$KEYSTORE_FILE" ] && [ -s "$KEYSTORE_FILE" ]; then
+            echo "Building signed release APK..."
+            ./gradlew --no-daemon clean assembleRelease
+            APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          else
+            echo "Building debug APK..."
+            ./gradlew --no-daemon clean assembleDebug
+            APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
           fi
 
-          if [ -z "$APK" ]; then
-            echo "ERROR: No APK was produced."
-            exit 1
-          fi
+          mkdir -p release
+          cp "$APK" release/Plaquote.apk
+          echo "APK ready: release/Plaquote.apk"
+          ls -lh release/Plaquote.apk
 
-          echo "Using APK: $APK"
-          cp "$APK" app/build/outputs/apk/Plaquote.apk
-
-      - name: Upload APK artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Plaquote-apk
-          path: app/build/outputs/apk/Plaquote.apk
+          path: release/Plaquote.apk
 
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: app/build/outputs/apk/Plaquote.apk
-          generate_release_notes: true
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="1.3.${{ github.run_number }}"
+          echo "Creating release v${VERSION}"
+
+          gh release create "v${VERSION}" \
+            release/Plaquote.apk \
+            --title "Plaquote ${VERSION}" \
+            --generate-notes \
+            --latest
