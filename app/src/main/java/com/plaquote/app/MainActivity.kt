@@ -14,6 +14,7 @@ import android.view.*
 import android.view.animation.DecelerateInterpolator
 import android.widget.*
 import androidx.core.content.FileProvider
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.*
 import java.net.HttpURLConnection
@@ -37,11 +38,71 @@ class MainActivity : Activity() {
     }
 }
 
+// ==================== DATA ====================
+
+data class Patient(
+    val id: Long,
+    val chamber: String,
+    val name: String,
+    val age: String,
+    val gender: String,
+    val phone: String
+)
+
+object PatientStore {
+    private const val PREFS = "plaquote_prefs"
+    private const val KEY = "patients"
+
+    fun load(ctx: Context): MutableList<Patient> {
+        val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val json = prefs.getString(KEY, "[]") ?: "[]"
+        val list = mutableListOf<Patient>()
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                list.add(
+                    Patient(
+                        id = o.getLong("id"),
+                        chamber = o.getString("chamber"),
+                        name = o.getString("name"),
+                        age = o.getString("age"),
+                        gender = o.getString("gender"),
+                        phone = o.getString("phone")
+                    )
+                )
+            }
+        } catch (_: Exception) {}
+        return list
+    }
+
+    fun save(ctx: Context, list: List<Patient>) {
+        val arr = JSONArray()
+        list.forEach {
+            arr.put(JSONObject().apply {
+                put("id", it.id)
+                put("chamber", it.chamber)
+                put("name", it.name)
+                put("age", it.age)
+                put("gender", it.gender)
+                put("phone", it.phone)
+            })
+        }
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY, arr.toString()).apply()
+    }
+}
+
+// ==================== MAIN VIEW ====================
+
 class PlaquoteView(private val ctx: Context) : View(ctx) {
 
     private var themeProgress = 0f
     private var targetDark = false
     private var animator: ValueAnimator? = null
+
+    private val patients = PatientStore.load(ctx)
+    private val noteRects = mutableListOf<Pair<RectF, Patient>>()
 
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val toothPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -92,7 +153,9 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
     override fun onDraw(c: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
+        noteRects.clear()
 
+        val isDark = themeProgress > 0.5f
         val bg = lerpColor(Color.WHITE, Color.rgb(11, 18, 32), themeProgress)
         c.drawColor(bg)
 
@@ -100,12 +163,14 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         toothPaint.color = toothColor
         p.color = toothColor
 
-        for ((nx, ny) in sparkles) {
-            drawSparkle(c, nx * w, ny * h, 6f + (nx * 5f), toothColor)
-        }
-
-        for (t in teeth) {
-            drawMolar(c, t.nx * w, t.ny * h, 28f * t.scale, t.sparkle, t.shine)
+        // Background decorations (only when no notes)
+        if (patients.isEmpty()) {
+            for ((nx, ny) in sparkles) {
+                drawSparkle(c, nx * w, ny * h, 6f + (nx * 5f), toothColor)
+            }
+            for (t in teeth) {
+                drawMolar(c, t.nx * w, t.ny * h, 28f * t.scale, t.sparkle, t.shine)
+            }
         }
 
         // Header
@@ -113,15 +178,61 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         c.drawRect(0f, 0f, w, h * 0.14f, p)
         p.shader = null
 
-        // Theme toggle
         drawToggle(c, 24f, 26f, 168f, 50f)
 
-        // Search button
+        // Search
         p.color = Color.argb(65, 255, 255, 255)
         c.drawCircle(w - 52f, 52f, 26f, p)
         drawSearchIcon(c, w - 52f, 52f)
 
-        // FAB (+)
+        // Notes list
+        if (patients.isNotEmpty()) {
+            val startY = h * 0.16f + 20f
+            val cardH = 110f
+            val gap = 16f
+            val margin = 28f
+
+            patients.forEachIndexed { index, patient ->
+                val top = startY + index * (cardH + gap)
+                if (top + cardH > h - 100f) return@forEachIndexed
+
+                val rect = RectF(margin, top, w - margin, top + cardH)
+                noteRects.add(rect to patient)
+
+                // Card background
+                p.color = if (isDark) Color.rgb(30, 40, 60) else Color.WHITE
+                p.setShadowLayer(12f, 0f, 4f, Color.argb(40, 0, 0, 0))
+                setLayerType(LAYER_TYPE_SOFTWARE, p)
+                c.drawRoundRect(rect, 20f, 20f, p)
+                p.clearShadowLayer()
+
+                // Left accent
+                p.color = blue
+                c.drawRoundRect(RectF(rect.left, rect.top, rect.left + 8f, rect.bottom), 20f, 20f, p)
+
+                // Text
+                p.color = if (isDark) Color.WHITE else Color.parseColor("#1a1a1a")
+                p.textSize = 18f
+                p.typeface = Typeface.DEFAULT_BOLD
+                c.drawText(patient.name, rect.left + 28f, rect.top + 36f, p)
+
+                p.typeface = Typeface.DEFAULT
+                p.textSize = 14f
+                p.color = if (isDark) Color.rgb(180, 200, 230) else Color.parseColor("#555555")
+                c.drawText("${patient.chamber}  •  ${patient.age} yrs  •  ${patient.gender}", rect.left + 28f, rect.top + 62f, p)
+                c.drawText(patient.phone, rect.left + 28f, rect.top + 86f, p)
+            }
+        } else {
+            // Empty state text
+            p.color = if (isDark) Color.rgb(150, 170, 200) else Color.rgb(120, 140, 170)
+            p.textSize = 16f
+            p.textAlign = Paint.Align.CENTER
+            c.drawText("No patients yet", w / 2, h * 0.55f, p)
+            c.drawText("Tap + to add one", w / 2, h * 0.55f + 28f, p)
+            p.textAlign = Paint.Align.LEFT
+        }
+
+        // FAB
         p.setShadowLayer(16f, 0f, 6f, Color.argb(70, 0, 70, 180))
         setLayerType(LAYER_TYPE_SOFTWARE, p)
         p.color = blue
@@ -173,11 +284,9 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
     private fun drawToggle(c: Canvas, x: Float, y: Float, w: Float, h: Float) {
         p.color = Color.argb(190, 0, 50, 130)
         c.drawRoundRect(x, y, x + w, y + h, h / 2, h / 2, p)
-
         val knobX = x + h / 2 + (w - h) * themeProgress
         p.color = Color.WHITE
         c.drawCircle(knobX, y + h / 2, h / 2 - 5f, p)
-
         p.color = if (themeProgress > 0.5f) Color.rgb(210, 225, 250) else blue
         p.textSize = 22f
         p.textAlign = Paint.Align.CENTER
@@ -215,17 +324,20 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         val w = width.toFloat()
         val h = height.toFloat()
 
-        // Theme toggle
         if (x in 24f..192f && y in 26f..76f) {
             toggleTheme()
-        }
-        // Search
-        else if ((x - (w - 52f)).pow(2) + (y - 52f).pow(2) < 30f * 30f) {
+        } else if ((x - (w - 52f)).pow(2) + (y - 52f).pow(2) < 30f * 30f) {
             Toast.makeText(ctx, "Search — coming soon", Toast.LENGTH_SHORT).show()
-        }
-        // + button (FAB)
-        else if ((x - (w - 56f)).pow(2) + (y - (h - 58f)).pow(2) < 36f * 36f) {
+        } else if ((x - (w - 56f)).pow(2) + (y - (h - 58f)).pow(2) < 36f * 36f) {
             showAddPatientDialog()
+        } else {
+            // Check note cards
+            for ((rect, patient) in noteRects) {
+                if (rect.contains(x, y)) {
+                    showPatientDetail(patient)
+                    return true
+                }
+            }
         }
         return true
     }
@@ -243,33 +355,37 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
 
     private fun showAddPatientDialog() {
         val activity = ctx as Activity
+        val isDark = themeProgress > 0.5f
 
-        // Main white card
+        val bgColor     = if (isDark) Color.rgb(30, 40, 60) else Color.WHITE
+        val textColor   = if (isDark) Color.WHITE else Color.parseColor("#1a1a1a")
+        val hintColor   = if (isDark) Color.rgb(150, 170, 200) else Color.parseColor("#888888")
+        val fieldBg     = if (isDark) Color.rgb(45, 55, 80) else Color.parseColor("#F5F7FA")
+        val labelColor  = if (isDark) Color.rgb(180, 200, 230) else Color.parseColor("#555555")
+
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 40, 48, 32)
             background = GradientDrawable().apply {
-                setColor(Color.WHITE)
+                setColor(bgColor)
                 cornerRadius = 28f
             }
         }
 
-        // Title
         val title = TextView(activity).apply {
             text = "New Patient"
             textSize = 20f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#1a1a1a"))
+            setTextColor(textColor)
             setPadding(0, 0, 0, 28)
         }
         card.addView(title)
 
-        // Helper to create labeled field
         fun labeledField(label: String, hint: String, inputType: Int = InputType.TYPE_CLASS_TEXT): EditText {
             val labelView = TextView(activity).apply {
                 text = label
                 textSize = 13f
-                setTextColor(Color.parseColor("#555555"))
+                setTextColor(labelColor)
                 setPadding(4, 12, 0, 6)
             }
             card.addView(labelView)
@@ -277,10 +393,12 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
             val edit = EditText(activity).apply {
                 this.hint = hint
                 this.inputType = inputType
+                setTextColor(textColor)          // typed text color - always visible
+                setHintTextColor(hintColor)
                 setPadding(28, 22, 28, 22)
                 textSize = 15f
                 background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#F5F7FA"))
+                    setColor(fieldBg)
                     cornerRadius = 16f
                 }
             }
@@ -288,51 +406,44 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
             return edit
         }
 
-        // Chamber (Spinner)
+        // Chamber
         val chamberLabel = TextView(activity).apply {
             text = "Chamber"
             textSize = 13f
-            setTextColor(Color.parseColor("#555555"))
+            setTextColor(labelColor)
             setPadding(4, 12, 0, 6)
         }
         card.addView(chamberLabel)
 
         val chamberSpinner = Spinner(activity).apply {
-            adapter = ArrayAdapter(
-                activity,
-                android.R.layout.simple_spinner_dropdown_item,
-                listOf("Mohanpur", "Ranirbazar")
-            )
+            adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item,
+                listOf("Mohanpur", "Ranirbazar"))
             setPadding(16, 12, 16, 12)
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#F5F7FA"))
+                setColor(fieldBg)
                 cornerRadius = 16f
             }
         }
         card.addView(chamberSpinner)
 
-        // Other fields
         val nameEdit  = labeledField("Patient's Name", "Enter full name")
         val ageEdit   = labeledField("Age", "e.g. 32", InputType.TYPE_CLASS_NUMBER)
-        
+
         // Gender
         val genderLabel = TextView(activity).apply {
             text = "Gender"
             textSize = 13f
-            setTextColor(Color.parseColor("#555555"))
+            setTextColor(labelColor)
             setPadding(4, 16, 0, 6)
         }
         card.addView(genderLabel)
 
         val genderSpinner = Spinner(activity).apply {
-            adapter = ArrayAdapter(
-                activity,
-                android.R.layout.simple_spinner_dropdown_item,
-                listOf("Male", "Female", "Other")
-            )
+            adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item,
+                listOf("Male", "Female", "Other"))
             setPadding(16, 12, 16, 12)
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#F5F7FA"))
+                setColor(fieldBg)
                 cornerRadius = 16f
             }
         }
@@ -340,7 +451,7 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
 
         val phoneEdit = labeledField("Phone Number", "e.g. 9876543210", InputType.TYPE_CLASS_PHONE)
 
-        // Buttons row
+        // Buttons
         val buttonRow = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 32, 0, 0)
@@ -348,9 +459,9 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
 
         val cancelBtn = Button(activity).apply {
             text = "Cancel"
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(if (isDark) Color.WHITE else Color.parseColor("#666666"))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#EEEEEE"))
+                setColor(if (isDark) Color.rgb(60, 70, 90) else Color.parseColor("#EEEEEE"))
                 cornerRadius = 16f
             }
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -374,17 +485,13 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         buttonRow.addView(saveBtn)
         card.addView(buttonRow)
 
-        // Dialog with dimmed background
         val dialog = Dialog(activity)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(card)
         dialog.window?.apply {
             setBackgroundDrawableResource(android.R.color.transparent)
-            setLayout(
-                (activity.resources.displayMetrics.widthPixels * 0.90).toInt(),
-                WindowManager.LayoutParams.WRAP_CONTENT
-            )
-            // Dim / blur effect
+            setLayout((activity.resources.displayMetrics.widthPixels * 0.90).toInt(),
+                WindowManager.LayoutParams.WRAP_CONTENT)
             setDimAmount(0.55f)
             addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
         }
@@ -392,27 +499,104 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         cancelBtn.setOnClickListener { dialog.dismiss() }
 
         saveBtn.setOnClickListener {
-            val chamber = chamberSpinner.selectedItem.toString()
-            val name    = nameEdit.text.toString().trim()
-            val age     = ageEdit.text.toString().trim()
-            val gender  = genderSpinner.selectedItem.toString()
-            val phone   = phoneEdit.text.toString().trim()
-
+            val name = nameEdit.text.toString().trim()
             if (name.isEmpty()) {
                 Toast.makeText(activity, "Please enter patient's name", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            // For now just show confirmation (later we can save to database)
-            Toast.makeText(
-                activity,
-                "Saved:\n$chamber • $name • $age yrs • $gender • $phone",
-                Toast.LENGTH_LONG
-            ).show()
+            val patient = Patient(
+                id = System.currentTimeMillis(),
+                chamber = chamberSpinner.selectedItem.toString(),
+                name = name,
+                age = ageEdit.text.toString().trim(),
+                gender = genderSpinner.selectedItem.toString(),
+                phone = phoneEdit.text.toString().trim()
+            )
 
+            patients.add(0, patient)          // newest on top
+            PatientStore.save(ctx, patients)
+            invalidate()                      // refresh home screen
             dialog.dismiss()
+            Toast.makeText(activity, "Patient saved", Toast.LENGTH_SHORT).show()
         }
 
+        dialog.show()
+    }
+
+    // ==================== PATIENT DETAIL ====================
+
+    private fun showPatientDetail(patient: Patient) {
+        val activity = ctx as Activity
+        val isDark = themeProgress > 0.5f
+
+        val bgColor   = if (isDark) Color.rgb(30, 40, 60) else Color.WHITE
+        val textColor = if (isDark) Color.WHITE else Color.parseColor("#1a1a1a")
+        val subColor  = if (isDark) Color.rgb(180, 200, 230) else Color.parseColor("#555555")
+
+        val card = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 40, 48, 32)
+            background = GradientDrawable().apply {
+                setColor(bgColor)
+                cornerRadius = 28f
+            }
+        }
+
+        fun row(label: String, value: String) {
+            val l = TextView(activity).apply {
+                text = label
+                textSize = 13f
+                setTextColor(subColor)
+                setPadding(0, 16, 0, 4)
+            }
+            val v = TextView(activity).apply {
+                text = value.ifEmpty { "—" }
+                textSize = 17f
+                setTextColor(textColor)
+                setTypeface(typeface, Typeface.BOLD)
+            }
+            card.addView(l)
+            card.addView(v)
+        }
+
+        val title = TextView(activity).apply {
+            text = patient.name
+            textSize = 22f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(textColor)
+            setPadding(0, 0, 0, 12)
+        }
+        card.addView(title)
+
+        row("Chamber", patient.chamber)
+        row("Age", if (patient.age.isNotEmpty()) "${patient.age} years" else "")
+        row("Gender", patient.gender)
+        row("Phone", patient.phone)
+
+        val closeBtn = Button(activity).apply {
+            text = "Close"
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                setColor(blue)
+                cornerRadius = 16f
+            }
+            setPadding(0, 24, 0, 0)
+        }
+        card.addView(closeBtn)
+
+        val dialog = Dialog(activity)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(card)
+        dialog.window?.apply {
+            setBackgroundDrawableResource(android.R.color.transparent)
+            setLayout((activity.resources.displayMetrics.widthPixels * 0.88).toInt(),
+                WindowManager.LayoutParams.WRAP_CONTENT)
+            setDimAmount(0.55f)
+            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        }
+
+        closeBtn.setOnClickListener { dialog.dismiss() }
         dialog.show()
     }
 }
