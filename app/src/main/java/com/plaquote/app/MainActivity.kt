@@ -4,15 +4,13 @@ import android.animation.ValueAnimator
 import android.app.*
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.graphics.*
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.*
 import android.provider.Settings
 import android.view.*
 import android.view.animation.DecelerateInterpolator
-import android.widget.*
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.*
@@ -235,7 +233,7 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         } else if ((x - (w - 52f)).pow(2) + (y - 52f).pow(2) < 30f * 30f) {
             Toast.makeText(ctx, "Search — coming soon", Toast.LENGTH_SHORT).show()
         } else if (x in 20f..168f && y > h - 90f) {
-            showAIHelpDialog()
+            Toast.makeText(ctx, "AI Help — coming soon", Toast.LENGTH_SHORT).show()
         }
         return true
     }
@@ -247,181 +245,6 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
             (Color.green(a) + (Color.green(b) - Color.green(a)) * t2).toInt(),
             (Color.blue(a)  + (Color.blue(b)  - Color.blue(a))  * t2).toInt()
         )
-    }
-
-    // ==================== AI HELP ====================
-
-    private fun showAIHelpDialog() {
-        val activity = ctx as Activity
-        val prefs = activity.getSharedPreferences("plaquote_prefs", Context.MODE_PRIVATE)
-        val savedKey = prefs.getString("gemini_api_key", null)
-
-        if (savedKey.isNullOrBlank()) {
-            askForApiKey(activity, prefs)
-        } else {
-            openChatDialog(activity, savedKey)
-        }
-    }
-
-    private fun askForApiKey(activity: Activity, prefs: SharedPreferences) {
-        val input = EditText(activity).apply {
-            hint = "Paste your Gemini API key here"
-            setPadding(40, 30, 40, 30)
-        }
-
-        AlertDialog.Builder(activity)
-            .setTitle("Gemini API Key Required")
-            .setMessage("Get a free key at:\nhttps://aistudio.google.com/app/apikey\n\nIt will be saved only on this device.")
-            .setView(input)
-            .setPositiveButton("Save & Continue") { _, _ ->
-                val key = input.text.toString().trim()
-                if (key.length > 20) {   // simple length check instead of prefix
-    prefs.edit().putString("gemini_api_key", key).apply()
-    openChatDialog(activity, key)
-} else {
-    Toast.makeText(activity, "Invalid API key", Toast.LENGTH_LONG).show()
-}
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun openChatDialog(activity: Activity, apiKey: String) {
-        val container = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 30, 40, 20)
-        }
-
-        val chatView = TextView(activity).apply {
-            text = "Ask any dental question...\n\n"
-            textSize = 15f
-            setTextColor(Color.parseColor("#222222"))
-            setPadding(0, 0, 0, 16)
-        }
-
-        val scroll = ScrollView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 480
-            )
-            addView(chatView)
-        }
-
-        val input = EditText(activity).apply {
-            hint = "Type your question..."
-            setPadding(28, 22, 28, 22)
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#F0F4F8"))
-                cornerRadius = 18f
-            }
-        }
-
-        val sendBtn = Button(activity).apply {
-            text = "Ask AI"
-            setBackgroundColor(Color.parseColor("#1677F0"))
-            setTextColor(Color.WHITE)
-
-            setOnClickListener {
-                val question = input.text.toString().trim()
-                if (question.isEmpty()) return@setOnClickListener
-
-                chatView.append("You: $question\n\n")
-                chatView.append("AI: Thinking...\n\n")
-                input.setText("")
-                scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
-                isEnabled = false
-
-                thread {
-                    val answer = askGemini(question, apiKey)
-                    activity.runOnUiThread {
-                        val current = chatView.text.toString()
-                        chatView.text = current.replace("AI: Thinking...\n\n", "AI: $answer\n\n")
-                        isEnabled = true
-                        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
-                    }
-                }
-            }
-        }
-
-        val changeKey = TextView(activity).apply {
-            text = "Change API Key"
-            setTextColor(Color.parseColor("#1677F0"))
-            textSize = 13f
-            setPadding(0, 18, 0, 0)
-            setOnClickListener {
-                activity.getSharedPreferences("plaquote_prefs", Context.MODE_PRIVATE)
-                    .edit().remove("gemini_api_key").apply()
-                Toast.makeText(activity, "API key cleared. Open AI Help again.", Toast.LENGTH_LONG).show()
-            }
-        }
-
-        container.addView(scroll)
-        container.addView(input)
-        container.addView(sendBtn)
-        container.addView(changeKey)
-
-        AlertDialog.Builder(activity)
-            .setTitle("Dental AI Help")
-            .setView(container)
-            .setNegativeButton("Close", null)
-            .show()
-    }
-
-    private fun askGemini(question: String, apiKey: String): String {
-        return try {
-            val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
-            val conn = url.openConnection() as HttpURLConnection
-            conn.requestMethod = "POST"
-            conn.setRequestProperty("Content-Type", "application/json")
-            conn.doOutput = true
-            conn.connectTimeout = 15000
-            conn.readTimeout = 25000
-
-            val prompt = """
-                You are a helpful and accurate dental assistant.
-                Answer clearly and professionally.
-                Focus only on dental and oral health topics.
-                Always end with this disclaimer:
-                "⚠️ This is general information only and not a substitute for professional dental advice."
-                
-                User question: $question
-            """.trimIndent()
-
-            val body = """
-                {
-                  "contents": [{
-                    "parts": [{"text": ${JSONObject.quote(prompt)}}]
-                  }]
-                }
-            """.trimIndent()
-
-            conn.outputStream.use { it.write(body.toByteArray()) }
-
-            val code = conn.responseCode
-            val response = if (code in 200..299) {
-                conn.inputStream.bufferedReader().use { it.readText() }
-            } else {
-                conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "Error $code"
-            }
-            conn.disconnect()
-
-            if (code !in 200..299) {
-                return "Sorry, AI is temporarily unavailable (Error $code).\nCheck your API key."
-            }
-
-            val json = JSONObject(response)
-            val candidates = json.optJSONArray("candidates")
-            if (candidates != null && candidates.length() > 0) {
-                val parts = candidates.getJSONObject(0)
-                    .optJSONObject("content")
-                    ?.optJSONArray("parts")
-                if (parts != null && parts.length() > 0) {
-                    return parts.getJSONObject(0).optString("text", "No answer received.")
-                }
-            }
-            "Sorry, I couldn't generate an answer."
-        } catch (e: Exception) {
-            "Connection error. Check your internet.\n(${e.message})"
-        }
     }
 }
 
