@@ -5,12 +5,14 @@ import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.*
 import android.provider.Settings
+import android.text.InputType
 import android.view.*
 import android.view.animation.DecelerateInterpolator
-import android.widget.Toast
+import android.widget.*
 import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.*
@@ -217,13 +219,13 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         if (x in 24f..192f && y in 26f..76f) {
             toggleTheme()
         }
-        // Search button
+        // Search
         else if ((x - (w - 52f)).pow(2) + (y - 52f).pow(2) < 30f * 30f) {
             Toast.makeText(ctx, "Search — coming soon", Toast.LENGTH_SHORT).show()
         }
         // + button (FAB)
-        else if ((x - (w - 56f)).pow(2) + (y - (h - 58f)).pow(2) < 35f * 35f) {
-            Toast.makeText(ctx, "Add note — coming soon", Toast.LENGTH_SHORT).show()
+        else if ((x - (w - 56f)).pow(2) + (y - (h - 58f)).pow(2) < 36f * 36f) {
+            showAddPatientDialog()
         }
         return true
     }
@@ -235,6 +237,183 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
             (Color.green(a) + (Color.green(b) - Color.green(a)) * t2).toInt(),
             (Color.blue(a)  + (Color.blue(b)  - Color.blue(a))  * t2).toInt()
         )
+    }
+
+    // ==================== ADD PATIENT FORM ====================
+
+    private fun showAddPatientDialog() {
+        val activity = ctx as Activity
+
+        // Main white card
+        val card = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 40, 48, 32)
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = 28f
+            }
+        }
+
+        // Title
+        val title = TextView(activity).apply {
+            text = "New Patient"
+            textSize = 20f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.parseColor("#1a1a1a"))
+            setPadding(0, 0, 0, 28)
+        }
+        card.addView(title)
+
+        // Helper to create labeled field
+        fun labeledField(label: String, hint: String, inputType: Int = InputType.TYPE_CLASS_TEXT): EditText {
+            val labelView = TextView(activity).apply {
+                text = label
+                textSize = 13f
+                setTextColor(Color.parseColor("#555555"))
+                setPadding(4, 12, 0, 6)
+            }
+            card.addView(labelView)
+
+            val edit = EditText(activity).apply {
+                this.hint = hint
+                this.inputType = inputType
+                setPadding(28, 22, 28, 22)
+                textSize = 15f
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#F5F7FA"))
+                    cornerRadius = 16f
+                }
+            }
+            card.addView(edit)
+            return edit
+        }
+
+        // Chamber (Spinner)
+        val chamberLabel = TextView(activity).apply {
+            text = "Chamber"
+            textSize = 13f
+            setTextColor(Color.parseColor("#555555"))
+            setPadding(4, 12, 0, 6)
+        }
+        card.addView(chamberLabel)
+
+        val chamberSpinner = Spinner(activity).apply {
+            adapter = ArrayAdapter(
+                activity,
+                android.R.layout.simple_spinner_dropdown_item,
+                listOf("Mohanpur", "Ranirbazar")
+            )
+            setPadding(16, 12, 16, 12)
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#F5F7FA"))
+                cornerRadius = 16f
+            }
+        }
+        card.addView(chamberSpinner)
+
+        // Other fields
+        val nameEdit  = labeledField("Patient's Name", "Enter full name")
+        val ageEdit   = labeledField("Age", "e.g. 32", InputType.TYPE_CLASS_NUMBER)
+        
+        // Gender
+        val genderLabel = TextView(activity).apply {
+            text = "Gender"
+            textSize = 13f
+            setTextColor(Color.parseColor("#555555"))
+            setPadding(4, 16, 0, 6)
+        }
+        card.addView(genderLabel)
+
+        val genderSpinner = Spinner(activity).apply {
+            adapter = ArrayAdapter(
+                activity,
+                android.R.layout.simple_spinner_dropdown_item,
+                listOf("Male", "Female", "Other")
+            )
+            setPadding(16, 12, 16, 12)
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#F5F7FA"))
+                cornerRadius = 16f
+            }
+        }
+        card.addView(genderSpinner)
+
+        val phoneEdit = labeledField("Phone Number", "e.g. 9876543210", InputType.TYPE_CLASS_PHONE)
+
+        // Buttons row
+        val buttonRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 32, 0, 0)
+        }
+
+        val cancelBtn = Button(activity).apply {
+            text = "Cancel"
+            setTextColor(Color.parseColor("#666666"))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#EEEEEE"))
+                cornerRadius = 16f
+            }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = 12
+            }
+        }
+
+        val saveBtn = Button(activity).apply {
+            text = "Save"
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                setColor(blue)
+                cornerRadius = 16f
+            }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = 12
+            }
+        }
+
+        buttonRow.addView(cancelBtn)
+        buttonRow.addView(saveBtn)
+        card.addView(buttonRow)
+
+        // Dialog with dimmed background
+        val dialog = Dialog(activity)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(card)
+        dialog.window?.apply {
+            setBackgroundDrawableResource(android.R.color.transparent)
+            setLayout(
+                (activity.resources.displayMetrics.widthPixels * 0.90).toInt(),
+                WindowManager.LayoutParams.WRAP_CONTENT
+            )
+            // Dim / blur effect
+            setDimAmount(0.55f)
+            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        }
+
+        cancelBtn.setOnClickListener { dialog.dismiss() }
+
+        saveBtn.setOnClickListener {
+            val chamber = chamberSpinner.selectedItem.toString()
+            val name    = nameEdit.text.toString().trim()
+            val age     = ageEdit.text.toString().trim()
+            val gender  = genderSpinner.selectedItem.toString()
+            val phone   = phoneEdit.text.toString().trim()
+
+            if (name.isEmpty()) {
+                Toast.makeText(activity, "Please enter patient's name", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // For now just show confirmation (later we can save to database)
+            Toast.makeText(
+                activity,
+                "Saved:\n$chamber • $name • $age yrs • $gender • $phone",
+                Toast.LENGTH_LONG
+            ).show()
+
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 }
 
