@@ -106,18 +106,20 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
             drawMolar(c, t.nx * w, t.ny * h, 28f * t.scale, t.sparkle, t.shine)
         }
 
+        // Header
         p.shader = LinearGradient(0f, 0f, w, h * 0.14f, blue, darkBlue, Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, w, h * 0.14f, p)
         p.shader = null
 
+        // Theme toggle
         drawToggle(c, 24f, 26f, 168f, 50f)
 
+        // Search button
         p.color = Color.argb(65, 255, 255, 255)
         c.drawCircle(w - 52f, 52f, 26f, p)
         drawSearchIcon(c, w - 52f, 52f)
 
-        drawAI(c, 20f, h - 74f)
-
+        // FAB (+)
         p.setShadowLayer(16f, 0f, 6f, Color.argb(70, 0, 70, 180))
         setLayerType(LAYER_TYPE_SOFTWARE, p)
         p.color = blue
@@ -190,23 +192,6 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         p.style = Paint.Style.FILL
     }
 
-    private fun drawAI(c: Canvas, x: Float, y: Float) {
-        p.color = blue
-        c.drawRoundRect(x, y, x + 148f, y + 48f, 24f, 24f, p)
-        p.color = Color.WHITE
-        c.drawRoundRect(x + 12f, y + 12f, x + 48f, y + 36f, 8f, 8f, p)
-        p.color = blue
-        c.drawCircle(x + 24f, y + 24f, 3f, p)
-        c.drawCircle(x + 36f, y + 24f, 3f, p)
-        p.strokeWidth = 2f
-        c.drawLine(x + 25f, y + 31f, x + 35f, y + 31f, p)
-        p.color = Color.WHITE
-        p.textSize = 17f
-        p.typeface = Typeface.DEFAULT_BOLD
-        c.drawText("AI Help", x + 58f, y + 30f, p)
-        p.typeface = Typeface.DEFAULT
-    }
-
     private fun toggleTheme() {
         targetDark = !targetDark
         animator?.cancel()
@@ -228,12 +213,17 @@ class PlaquoteView(private val ctx: Context) : View(ctx) {
         val w = width.toFloat()
         val h = height.toFloat()
 
+        // Theme toggle
         if (x in 24f..192f && y in 26f..76f) {
             toggleTheme()
-        } else if ((x - (w - 52f)).pow(2) + (y - 52f).pow(2) < 30f * 30f) {
+        }
+        // Search button
+        else if ((x - (w - 52f)).pow(2) + (y - 52f).pow(2) < 30f * 30f) {
             Toast.makeText(ctx, "Search — coming soon", Toast.LENGTH_SHORT).show()
-        } else if (x in 20f..168f && y > h - 90f) {
-            Toast.makeText(ctx, "AI Help — coming soon", Toast.LENGTH_SHORT).show()
+        }
+        // + button (FAB)
+        else if ((x - (w - 56f)).pow(2) + (y - (h - 58f)).pow(2) < 35f * 35f) {
+            Toast.makeText(ctx, "Add note — coming soon", Toast.LENGTH_SHORT).show()
         }
         return true
     }
